@@ -8,13 +8,16 @@ class SteganographyApp:
     def __init__(self, root):
         self.root = root  # Set the root window
         self.root.title("LSB Steganography and Steganalysis")  # Set the title of the window
+        self.root.geometry("700x500")
+        self.root.minsize(700,500)
+        self.root.maxsize(700,500)
         
         # Create a frame to hold the widgets
         self.frame = tk.Frame(root)
         self.frame.pack(pady=20)  # Add padding around the frame
         
         # Button to select the cover file
-        self.cover_button = tk.Button(self.frame, text="Select Cover File", command=self.load_cover)
+        self.cover_button = tk.Button(self.frame, text="Select Input File", command=self.load_cover)
         self.cover_button.grid(row=0, column=0, padx=10)  # Place the button in the grid with padding
         
         # Button to select the payload file
@@ -57,7 +60,7 @@ class SteganographyApp:
             if self.cover_path.lower().endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 print(f"Selected cover file path: {self.cover_path}")  # Debugging statement
                 image = Image.open(self.cover_path)  # Open the image
-                image.thumbnail((250, 250))  # Resize the image
+                image.thumbnail((300, 300))  # Resize the image
                 self.cover_image = ImageTk.PhotoImage(image)  # Convert the image to PhotoImage
                 self.cover_label.config(image=self.cover_image)  # Display the image in the label
             elif self.cover_path.lower().endswith('.wav'):
@@ -73,6 +76,7 @@ class SteganographyApp:
         if self.payload_path:
             messagebox.showinfo("Payload File", f"{os.path.basename(self.payload_path)} selected")  # Show a message with the payload file name
 
+    # Need to change this to prof's code. His seems to be better (?)
     def encode_image(self, cover_image_path, payload_text, num_lsb):
         image = Image.open(cover_image_path)  # Open the cover image
         binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111110'  # Convert the payload text to binary and add an end delimiter
@@ -160,7 +164,7 @@ class SteganographyApp:
             if self.cover_path.endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 stego_image_path = self.encode_image(self.cover_path, payload_text, self.lsb_var.get())  # Encode the payload into the image
                 stego_image = Image.open(stego_image_path)  # Open the stego image
-                stego_image.thumbnail((250, 250))  # Resize the stego image
+                stego_image.thumbnail((300, 300))  # Resize the stego image
                 self.stego_image = ImageTk.PhotoImage(stego_image)  # Convert the stego image to PhotoImage
                 self.stego_label.config(image=self.stego_image)  # Display the stego image in the label
                 messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_image_path}")  # Show a success message
