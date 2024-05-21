@@ -4,6 +4,8 @@ venv\Scripts\activate
 pip install tkinker
 # install Pillow
 pip install pillow
+# install cv2
+pip install opencv-python
 # run program
 python steganography_app.py
 # Testing

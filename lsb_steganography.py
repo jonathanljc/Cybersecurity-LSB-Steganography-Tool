@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox  # Import specific components from tk
 from PIL import Image, ImageTk, UnidentifiedImageError  # Import PIL for image handling
 import wave  # Import wave for audio file handling
 import os  # Import os for operating system interactions
+import cv2, numpy as np
 
 class SteganographyApp:
     def __init__(self, root):
@@ -76,48 +77,115 @@ class SteganographyApp:
         if self.payload_path:
             messagebox.showinfo("Payload File", f"{os.path.basename(self.payload_path)} selected")  # Show a message with the payload file name
 
-    # Need to change this to prof's code. His seems to be better (?)
+    def to_bin(self, data): # Convert data to binary format as a string
+        if isinstance(data, str):
+            return ''.join([ format(ord(i), "08b") for i in data ])
+        elif isinstance(data, bytes) or isinstance(data, np.ndarray):
+            return [ format(i, "08b") for i in data ]
+        elif isinstance(data, int) or isinstance(data, np.uint8):
+            return format(data, "08b")
+        else:
+            raise TypeError("Type not supported.")
+    
     def encode_image(self, cover_image_path, payload_text, num_lsb):
-        image = Image.open(cover_image_path)  # Open the cover image
-        binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111110'  # Convert the payload text to binary and add an end delimiter
-        pixels = image.load()  # Load the image pixels
-        width, height = image.size  # Get the image dimensions
-        binary_index = 0
+        # image = Image.open(cover_image_path)  # Open the cover image
+        # binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111110'  # Convert the payload text to binary and add an end delimiter
+        # pixels = image.load()  # Load the image pixels
+        # width, height = image.size  # Get the image dimensions
+        # binary_index = 0
         
-        for y in range(height):
-            for x in range(width):
-                if binary_index < len(binary_payload):
-                    pixel = list(pixels[x, y])  # Get the pixel value
-                    for i in range(3):  # For RGB channels
-                        if binary_index < len(binary_payload):
-                            pixel[i] = pixel[i] & ~(1 << (num_lsb - 1)) | (int(binary_payload[binary_index]) << (num_lsb - 1))  # Modify the LSB
-                            binary_index += 1
-                    pixels[x, y] = tuple(pixel)  # Set the modified pixel
-                else:
+        # for y in range(height):
+        #     for x in range(width):
+        #         if binary_index < len(binary_payload):
+        #             pixel = list(pixels[x, y])  # Get the pixel value
+        #             for i in range(3):  # For RGB channels
+        #                 if binary_index < len(binary_payload):
+        #                     pixel[i] = pixel[i] & ~(1 << (num_lsb - 1)) | (int(binary_payload[binary_index]) << (num_lsb - 1))  # Modify the LSB
+        #                     binary_index += 1
+        #             pixels[x, y] = tuple(pixel)  # Set the modified pixel
+        #         else:
+        #             break
+
+        # stego_image_path = cover_image_path.split('.')[0] + '_stego.png'  # Create the path for the stego image
+        # image.save(stego_image_path)  # Save the stego image
+        # return stego_image_path
+    
+        # BOTTOM CODE IS FOR CV2 VERSION AKA PROF VERSION
+
+        # read the image
+        image = cv2.imread(cover_image_path)
+        # maximum bytes to encode
+        n_bytes = image.shape[0] * image.shape[1] * 3 // 8
+        if len(payload_text) > n_bytes:
+            raise ValueError("[!] Insufficient bytes, need bigger image or less data.")
+        # add stopping criteria
+        payload_text += "====="
+        data_index = 0
+        # convert data to binary
+        binary_payload_text = self.to_bin(payload_text)
+        data_len = len(binary_payload_text)
+        for row in image:
+            for pixel in row:
+                # convert RGB values to binary format
+                r, g, b = map(lambda x: self.to_bin(x), pixel)
+                # modify the least significant bit only if there is still data to store
+                if data_index < data_len:
+                    # least significant red pixel bit
+                    pixel[0] = int(r[:-num_lsb] + binary_payload_text[data_index:data_index+num_lsb], 2)
+                    data_index += num_lsb
+                if data_index < data_len: # least significant green pixel bit
+                    pixel[1] = int(g[:-num_lsb] + binary_payload_text[data_index:data_index+num_lsb], 2)
+                    data_index += num_lsb
+                if data_index < data_len: # least significant blue pixel bit
+                    pixel[2] = int(b[:-num_lsb] + binary_payload_text[data_index:data_index+num_lsb], 2)
+                    data_index += num_lsb
+                if data_index >= data_len:
                     break
-        
+
         stego_image_path = cover_image_path.split('.')[0] + '_stego.png'  # Create the path for the stego image
-        image.save(stego_image_path)  # Save the stego image
+        cv2.imwrite(stego_image_path, image)
         return stego_image_path
 
     def decode_image(self, stego_image_path, num_lsb):
-        image = Image.open(stego_image_path)  # Open the stego image
-        pixels = image.load()  # Load the image pixels
-        width, height = image.size  # Get the image dimensions
-        binary_payload = ''
+        # image = Image.open(stego_image_path)  # Open the stego image
+        # pixels = image.load()  # Load the image pixels
+        # width, height = image.size  # Get the image dimensions
+        # binary_payload = ''
         
-        for y in range(height):
-            for x in range(width):
-                pixel = pixels[x, y]
-                for i in range(3):  # For RGB channels
-                    binary_payload += str((pixel[i] >> (num_lsb - 1)) & 1)  # Extract the LSB
+        # for y in range(height):
+        #     for x in range(width):
+        #         pixel = pixels[x, y]
+        #         for i in range(3):  # For RGB channels
+        #             binary_payload += str((pixel[i] >> (num_lsb - 1)) & 1)  # Extract the LSB
         
-        # Split the binary payload into bytes and convert to characters
-        byte_payload = [binary_payload[i:i+8] for i in range(0, len(binary_payload), 8)]
-        decoded_text = ''.join(chr(int(byte, 2)) for byte in byte_payload)
+        # # Split the binary payload into bytes and convert to characters
+        # byte_payload = [binary_payload[i:i+8] for i in range(0, len(binary_payload), 8)]
+        # decoded_text = ''.join(chr(int(byte, 2)) for byte in byte_payload)
         
-        # Find the end delimiter and return the payload
-        return decoded_text.split(chr(255) * 2)[0]
+        # # Find the end delimiter and return the payload
+        # return decoded_text.split(chr(255) * 2)[0]
+    
+        # BOTTOM CODE IS FOR CV2 VERSION AKA PROF VERSION
+
+        # read the image
+        image = cv2.imread(stego_image_path)
+        binary_data = ""
+        for row in image:
+            for pixel in row:
+                # convert RGB values to binary format
+                r, g, b = map(lambda x: self.to_bin(x), pixel)
+                # For each color channel
+                for color in [r, g, b]:
+                    binary_data += color[-num_lsb:]
+        # split by 8-bits
+        all_bytes = [binary_data[i: i+8] for i in range(0, len(binary_data), 8)]
+        # convert from bits to characters
+        decoded_data = ""
+        for byte in all_bytes:
+            decoded_data += chr(int(byte, 2))
+            if decoded_data[-5:] == "=====":
+                break
+        return decoded_data[:-5]
 
     def encode_audio(self, cover_audio_path, payload_text, num_lsb):
         with wave.open(cover_audio_path, 'rb') as audio:
