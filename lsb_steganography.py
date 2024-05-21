@@ -9,9 +9,9 @@ class SteganographyApp:
     def __init__(self, root):
         self.root = root  # Set the root window
         self.root.title("LSB Steganography and Steganalysis")  # Set the title of the window
-        self.root.geometry("700x500")
-        self.root.minsize(700,500)
-        self.root.maxsize(700,500)
+        self.root.geometry("1200x800")
+        self.root.minsize(1200,800)
+        self.root.maxsize(1200,800)
         
         # Create a frame to hold the widgets
         self.frame = tk.Frame(root)
@@ -61,7 +61,7 @@ class SteganographyApp:
             if self.cover_path.lower().endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 print(f"Selected cover file path: {self.cover_path}")  # Debugging statement
                 image = Image.open(self.cover_path)  # Open the image
-                image.thumbnail((300, 300))  # Resize the image
+                image.thumbnail((500, 500))  # Resize the image
                 self.cover_image = ImageTk.PhotoImage(image)  # Convert the image to PhotoImage
                 self.cover_label.config(image=self.cover_image)  # Display the image in the label
             elif self.cover_path.lower().endswith('.wav'):
@@ -184,8 +184,10 @@ class SteganographyApp:
         for byte in all_bytes:
             decoded_data += chr(int(byte, 2))
             if decoded_data[-5:] == "=====":
-                break
-        return decoded_data[:-5]
+                return decoded_data[:-5]
+            if decoded_data[-4:] == "====":
+                return decoded_data[:-4]
+                
 
     def encode_audio(self, cover_audio_path, payload_text, num_lsb):
         with wave.open(cover_audio_path, 'rb') as audio:
@@ -232,7 +234,7 @@ class SteganographyApp:
             if self.cover_path.endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 stego_image_path = self.encode_image(self.cover_path, payload_text, self.lsb_var.get())  # Encode the payload into the image
                 stego_image = Image.open(stego_image_path)  # Open the stego image
-                stego_image.thumbnail((300, 300))  # Resize the stego image
+                stego_image.thumbnail((500, 500))  # Resize the stego image
                 self.stego_image = ImageTk.PhotoImage(stego_image)  # Convert the stego image to PhotoImage
                 self.stego_label.config(image=self.stego_image)  # Display the stego image in the label
                 messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_image_path}")  # Show a success message
