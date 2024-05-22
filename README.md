@@ -4,8 +4,10 @@ venv\Scripts\activate
 pip install tkinker
 # install Pillow
 pip install pillow
-# install cv2
+# install cv2 (for image encoding/decoding)
 pip install opencv-python
+# install python-vlc (for video player in gui)
+pip install python-vlc
 # run program
 python steganography_app.py
 # Testing

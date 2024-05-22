@@ -4,6 +4,7 @@ from PIL import Image, ImageTk, UnidentifiedImageError  # Import PIL for image h
 import wave  # Import wave for audio file handling
 import os  # Import os for operating system interactions
 import cv2, numpy as np
+import vlc
 
 class SteganographyApp:
     def __init__(self, root):
@@ -52,11 +53,29 @@ class SteganographyApp:
     def load_cover(self):
         # Open a file dialog to select the cover file
         self.cover_path = filedialog.askopenfilename(
-            filetypes=[("Image Files", "*.bmp *.png *.gif *.jpg *.jpeg"), ("Audio Files", "*.wav")])
+            filetypes=[("Image Files", "*.bmp *.png *.gif *.jpg *.jpeg"), ("Audio Files", "*.wav"), ("Video Files", "*.mp4")])
         if not self.cover_path:
             return  # If no file is selected, return
         
         try:
+            self.stego_label.config(image="")
+            self.cover_label.config(image="")
+            self.cover_label.config(height=0, width=0)
+            self.stego_label.config(height=0, width=0)
+            if hasattr(self, 'player'):
+                # Stop the player
+                self.player.stop()
+                # Release the media
+                self.player.set_media(None)
+                # Delete the player
+                del self.player
+            if hasattr(self, 'player2'):
+                # Stop the player
+                self.player2.stop()
+                # Release the media
+                self.player2.set_media(None)
+                # Delete the player
+                del self.player2
             # Check if the selected file is an image
             if self.cover_path.lower().endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 print(f"Selected cover file path: {self.cover_path}")  # Debugging statement
@@ -64,6 +83,24 @@ class SteganographyApp:
                 image.thumbnail((500, 500))  # Resize the image
                 self.cover_image = ImageTk.PhotoImage(image)  # Convert the image to PhotoImage
                 self.cover_label.config(image=self.cover_image)  # Display the image in the label
+            elif self.cover_path.lower().endswith('.mp4'):
+                print(f"Selected cover file path: {self.cover_path}")  # Debugging statement
+                # Create a VLC instance
+                instance = vlc.Instance()
+                # Create a VLC player
+                self.player = instance.media_player_new()
+                # Create a new Media instance
+                media = instance.media_new(self.cover_path)
+                # Set the player media
+                self.player.set_media(media)
+                self.cover_label.config(height=70, width=70)
+                # Set the player window ID
+                self.player.set_hwnd(self.cover_label.winfo_id())
+                # Play the video
+                self.player.play()
+                # Get the total number of frames (not directly possible with python-vlc)
+                self.total_frames = None
+
             elif self.cover_path.lower().endswith('.wav'):
                 messagebox.showinfo("Cover File", "Audio file selected")  # Show a message for audio files
         except UnidentifiedImageError:
@@ -117,7 +154,8 @@ class SteganographyApp:
         # maximum bytes to encode
         n_bytes = image.shape[0] * image.shape[1] * 3 // 8
         if len(payload_text) > n_bytes:
-            raise ValueError("[!] Insufficient bytes, need bigger image or less data.")
+            messagebox.showwarning("Error", "Insufficient bytes, need bigger image or smaller payload.")
+            raise ValueError("Error: Insufficient bytes, need bigger image or smaller payload.")
         # add stopping criteria
         payload_text += "====="
         data_index = 0
@@ -188,6 +226,79 @@ class SteganographyApp:
             if decoded_data[-4:] == "====":
                 return decoded_data[:-4]
                 
+    def encode_video(self, cover_video_path, payload_text, num_lsb):
+        # Open the video file
+        video = cv2.VideoCapture(cover_video_path)
+        # Get the total number of frames
+        total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        # Get the frame width and height
+        frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # Prepare the writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        stego_video_path = cover_video_path.split('.')[0] + '_stego.mp4'
+        out = cv2.VideoWriter(stego_video_path, fourcc, 20.0, (frame_width, frame_height))
+        # Add stopping criteria
+        payload_text += "====="
+        binary_secret_data = self.to_bin(payload_text) # convert data to binary
+        data_index = 0
+        data_len = len(binary_secret_data)
+        for i in range(total_frames):
+            ret, frame = video.read()
+            if ret:
+                for row in frame:
+                    for pixel in row:
+                        r, g, b = map(lambda x: self.to_bin(x), pixel)
+                        if data_index < data_len:
+                            pixel[0] = int(r[:-num_lsb] + binary_secret_data[data_index:data_index+num_lsb], 2)
+                            data_index += num_lsb
+                            if data_index < data_len:
+                                pixel[1] = int(g[:-num_lsb] + binary_secret_data[data_index:data_index+num_lsb], 2)
+                                data_index += num_lsb
+                            if data_index < data_len:
+                                pixel[2] = int(b[:-num_lsb] + binary_secret_data[data_index:data_index+num_lsb], 2)
+                                data_index += num_lsb
+                        if data_index >= data_len:
+                            break
+                out.write(frame)
+            else:
+                break
+        video.release()
+        out.release()
+        return stego_video_path
+        
+    def decode_video(self, stego_video_path, num_lsb):
+        video = cv2.VideoCapture(stego_video_path)
+
+        binary_data = ""
+        decoded_data = ""
+        while True:
+            ret, frame = video.read()
+            if not ret:
+                break
+
+            # For each pixel in the frame
+            for row in frame:
+                for pixel in row:
+                    # Convert RGB values to binary format
+                    r, g, b = map(lambda x: self.to_bin(x), pixel)
+                    # For each color channel
+                    for color in [r, g, b]:
+                        binary_data += color[-num_lsb:]
+
+            # If enough data has been collected, try to decode it
+            while len(binary_data) >= 8:
+                # Split by 8-bits
+                byte = binary_data[:8]
+                binary_data = binary_data[8:]
+
+                # Convert from bits to characters
+                decoded_data += chr(int(byte, 2))
+
+        video.release()
+        # Check for padding and return the decoded data
+        return decoded_data.rstrip('=')
+
 
     def encode_audio(self, cover_audio_path, payload_text, num_lsb):
         with wave.open(cover_audio_path, 'rb') as audio:
@@ -238,6 +349,24 @@ class SteganographyApp:
                 self.stego_image = ImageTk.PhotoImage(stego_image)  # Convert the stego image to PhotoImage
                 self.stego_label.config(image=self.stego_image)  # Display the stego image in the label
                 messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_image_path}")  # Show a success message
+            
+            elif self.cover_path.endswith('.mp4'):
+                stego_video_path = self.encode_video(self.cover_path, payload_text, self.lsb_var.get())  # Encode the payload into the video
+                # Create a VLC instance
+                instance2 = vlc.Instance()
+                # Create a VLC player
+                self.player2 = instance2.media_player_new()
+                # Create a new Media instance
+                media2 = instance2.media_new(stego_video_path)
+                # Set the player media
+                self.player2.set_media(media2)
+                self.stego_label.config(height=70, width=70)
+                # Set the player window ID
+                self.player2.set_hwnd(self.stego_label.winfo_id())
+                # Play the video
+                self.player2.play()
+                messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_video_path}")
+
             elif self.cover_path.endswith('.wav'):
                 stego_audio_path = self.encode_audio(self.cover_path, payload_text, self.lsb_var.get())  # Encode the payload into the audio
                 messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_audio_path}")  # Show a success message
@@ -251,6 +380,9 @@ class SteganographyApp:
         if hasattr(self, 'cover_path'):
             if self.cover_path.endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 decoded_text = self.decode_image(self.cover_path, self.lsb_var.get())  # Decode the payload from the image
+                messagebox.showinfo("Decoding", f"Decoded text: {decoded_text}")  # Show the decoded text
+            elif self.cover_path.endswith('.mp4'):
+                decoded_text = self.decode_video(self.cover_path, self.lsb_var.get())  # Decode the payload from the image
                 messagebox.showinfo("Decoding", f"Decoded text: {decoded_text}")  # Show the decoded text
             elif self.cover_path.endswith('.wav'):
                 decoded_text = self.decode_audio(self.cover_path, self.lsb_var.get())  # Decode the payload from the audio
