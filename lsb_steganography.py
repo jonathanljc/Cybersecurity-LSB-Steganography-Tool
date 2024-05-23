@@ -305,7 +305,7 @@ class SteganographyApp:
             params = audio.getparams()  # Get audio parameters
             frames = bytearray(list(audio.readframes(audio.getnframes())))  # Read audio frames
         
-        binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111110'  # Convert the payload text to binary and add an end delimiter
+        binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111111'  # Convert the payload text to binary and add an end delimiter
         binary_index = 0
         
         for i in range(len(frames)):
