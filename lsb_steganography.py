@@ -5,6 +5,9 @@ import wave  # Import wave for audio file handling
 import os  # Import os for operating system interactions
 import cv2, numpy as np
 import vlc
+from moviepy.editor import VideoFileClip
+import shutil
+import stat
 
 class SteganographyApp:
     def __init__(self, root):
@@ -53,7 +56,7 @@ class SteganographyApp:
     def load_cover(self):
         # Open a file dialog to select the cover file
         self.cover_path = filedialog.askopenfilename(
-            filetypes=[("Image Files", "*.bmp *.png *.gif *.jpg *.jpeg"), ("Audio Files", "*.wav"), ("Video Files", "*.mp4")])
+            filetypes=[("Image Files", "*.bmp *.png *.gif *.jpg *.jpeg"), ("Audio Files", "*.wav"), ("Video Files", "*.mp4 *.mkv")])
         if not self.cover_path:
             return  # If no file is selected, return
         
@@ -83,7 +86,7 @@ class SteganographyApp:
                 image.thumbnail((500, 500))  # Resize the image
                 self.cover_image = ImageTk.PhotoImage(image)  # Convert the image to PhotoImage
                 self.cover_label.config(image=self.cover_image)  # Display the image in the label
-            elif self.cover_path.lower().endswith('.mp4'):
+            elif self.cover_path.lower().endswith(('.mp4', '.mkv')):
                 print(f"Selected cover file path: {self.cover_path}")  # Debugging statement
                 # Create a VLC instance
                 instance = vlc.Instance()
@@ -125,43 +128,23 @@ class SteganographyApp:
             raise TypeError("Type not supported.")
     
     def encode_image(self, cover_image_path, payload_text, num_lsb):
-        # image = Image.open(cover_image_path)  # Open the cover image
-        # binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111110'  # Convert the payload text to binary and add an end delimiter
-        # pixels = image.load()  # Load the image pixels
-        # width, height = image.size  # Get the image dimensions
-        # binary_index = 0
-        
-        # for y in range(height):
-        #     for x in range(width):
-        #         if binary_index < len(binary_payload):
-        #             pixel = list(pixels[x, y])  # Get the pixel value
-        #             for i in range(3):  # For RGB channels
-        #                 if binary_index < len(binary_payload):
-        #                     pixel[i] = pixel[i] & ~(1 << (num_lsb - 1)) | (int(binary_payload[binary_index]) << (num_lsb - 1))  # Modify the LSB
-        #                     binary_index += 1
-        #             pixels[x, y] = tuple(pixel)  # Set the modified pixel
-        #         else:
-        #             break
-
-        # stego_image_path = cover_image_path.split('.')[0] + '_stego.png'  # Create the path for the stego image
-        # image.save(stego_image_path)  # Save the stego image
-        # return stego_image_path
-    
-        # BOTTOM CODE IS FOR CV2 VERSION AKA PROF VERSION
-
+        print("Encoding image...")
         # read the image
         image = cv2.imread(cover_image_path)
         # maximum bytes to encode
-        n_bytes = image.shape[0] * image.shape[1] * 3 // 8
+        n_bytes = (image.shape[0] * image.shape[1] * image.shape[2] * num_lsb) // 8
         if len(payload_text) > n_bytes:
-            messagebox.showwarning("Error", "Insufficient bytes, need bigger image or smaller payload.")
-            raise ValueError("Error: Insufficient bytes, need bigger image or smaller payload.")
+            messagebox.showwarning("Error", "Insufficient bytes, need bigger image, smaller payload or more LSB.")
+            raise ValueError("Error: Insufficient bytes, need bigger image, smaller payload or more LSB.")
         # add stopping criteria
         payload_text += "====="
         data_index = 0
         # convert data to binary
+        print("Converting to binary...")
         binary_payload_text = self.to_bin(payload_text)
         data_len = len(binary_payload_text)
+
+        print("Encoding image... (Please wait)")
         for row in image:
             for pixel in row:
                 # convert RGB values to binary format
@@ -182,32 +165,15 @@ class SteganographyApp:
 
         stego_image_path = cover_image_path.split('.')[0] + '_stego.png'  # Create the path for the stego image
         cv2.imwrite(stego_image_path, image)
+        print("Encoding completed!")
         return stego_image_path
 
     def decode_image(self, stego_image_path, num_lsb):
-        # image = Image.open(stego_image_path)  # Open the stego image
-        # pixels = image.load()  # Load the image pixels
-        # width, height = image.size  # Get the image dimensions
-        # binary_payload = ''
-        
-        # for y in range(height):
-        #     for x in range(width):
-        #         pixel = pixels[x, y]
-        #         for i in range(3):  # For RGB channels
-        #             binary_payload += str((pixel[i] >> (num_lsb - 1)) & 1)  # Extract the LSB
-        
-        # # Split the binary payload into bytes and convert to characters
-        # byte_payload = [binary_payload[i:i+8] for i in range(0, len(binary_payload), 8)]
-        # decoded_text = ''.join(chr(int(byte, 2)) for byte in byte_payload)
-        
-        # # Find the end delimiter and return the payload
-        # return decoded_text.split(chr(255) * 2)[0]
-    
-        # BOTTOM CODE IS FOR CV2 VERSION AKA PROF VERSION
-
         # read the image
+        print("Reading image..")
         image = cv2.imread(stego_image_path)
         binary_data = ""
+        print("Decoding image... (Please wait)")
         for row in image:
             for pixel in row:
                 # convert RGB values to binary format
@@ -216,88 +182,142 @@ class SteganographyApp:
                 for color in [r, g, b]:
                     binary_data += color[-num_lsb:]
         # split by 8-bits
+        print("Splitting binary...")
         all_bytes = [binary_data[i: i+8] for i in range(0, len(binary_data), 8)]
         # convert from bits to characters
+        print("Converting binary to characters...")
         decoded_data = ""
         for byte in all_bytes:
             decoded_data += chr(int(byte, 2))
             if decoded_data[-5:] == "=====":
+                print("Decoding completed!")
                 return decoded_data[:-5]
             if decoded_data[-4:] == "====":
+                print("Decoding completed!")
                 return decoded_data[:-4]
                 
     def encode_video(self, cover_video_path, payload_text, num_lsb):
-        # Open the video file
-        video = cv2.VideoCapture(cover_video_path)
-        # Get the total number of frames
-        total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        # Get the frame width and height
-        frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        # Prepare the writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        stego_video_path = cover_video_path.split('.')[0] + '_stego.mp4'
-        out = cv2.VideoWriter(stego_video_path, fourcc, 20.0, (frame_width, frame_height))
-        # Add stopping criteria
-        payload_text += "====="
-        binary_secret_data = self.to_bin(payload_text) # convert data to binary
-        data_index = 0
-        data_len = len(binary_secret_data)
-        for i in range(total_frames):
-            ret, frame = video.read()
-            if ret:
-                for row in frame:
-                    for pixel in row:
-                        r, g, b = map(lambda x: self.to_bin(x), pixel)
-                        if data_index < data_len:
-                            pixel[0] = int(r[:-num_lsb] + binary_secret_data[data_index:data_index+num_lsb], 2)
-                            data_index += num_lsb
-                            if data_index < data_len:
-                                pixel[1] = int(g[:-num_lsb] + binary_secret_data[data_index:data_index+num_lsb], 2)
-                                data_index += num_lsb
-                            if data_index < data_len:
-                                pixel[2] = int(b[:-num_lsb] + binary_secret_data[data_index:data_index+num_lsb], 2)
-                                data_index += num_lsb
-                        if data_index >= data_len:
-                            break
-                out.write(frame)
-            else:
-                break
-        video.release()
-        out.release()
+        try:
+            print("Starting video encoding...")
+            n_lsb = int(num_lsb)
+            stego_video_path = self.encode_lsb(cover_video_path, payload_text, n_lsb)
+            return stego_video_path
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+    
+    # Function to extract frames using moviepy and PIL
+    def frame_extract(self, video_path):
+        if not os.path.exists("./temp"):
+            os.makedirs("temp")
+        temp_folder = "./temp/"
+        video_object = VideoFileClip(video_path)
+        for index, frame in enumerate(video_object.iter_frames()):
+            print(f"Extracting frames... (Frame {index})")
+            img = Image.fromarray(frame, 'RGB')
+            img.save(f'{temp_folder}{index}.png')
+
+    # Function to encode text into video frames using LSB and then reassemble using ffmpeg
+    def encode_lsb(self, video_path, text, n_lsb):
+        self.frame_extract(video_path)
+        
+        temp_folder = "./temp/"
+        # frames = sorted([f for f in os.listdir(temp_folder) if f.endswith('.png')])
+        frames = sorted([f for f in os.listdir(temp_folder) if f.endswith('.png')], key=lambda f: int(f.split('.')[0]))
+        
+        
+        text_bits = ''.join([format(ord(char), '08b') for char in text])
+        text_bits += '00000000' * 8  # Adding 8 null bytes to signify the end of the message
+        bit_index = 0
+
+        for frame_idx, frame_file in enumerate(frames):
+            frame = cv2.imread(os.path.join(temp_folder, frame_file))
+            if bit_index >= len(text_bits):
+                break  # Stop encoding if all text bits are encoded
+            print("Encoding frame {}...".format(frame_file))
+            # print(frame_file)
+            for i in range(frame.shape[0]):
+                for j in range(frame.shape[1]):
+                    for k in range(3):  # Iterate over the BGR channels
+                        if bit_index < len(text_bits):
+                            frame[i, j, k] = (frame[i, j, k] & ~((1 << n_lsb) - 1)) | int(text_bits[bit_index:bit_index+n_lsb], 2)
+                            bit_index += n_lsb
+
+            cv2.imwrite(os.path.join(temp_folder, frame_file), frame)
+
+        fps = VideoFileClip(video_path).fps
+        ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
+
+        print("Extracting audio...")
+        os.system(f'"{ffmpeg_path}" -i {video_path} -q:a 0 -map a temp/audio.mp3 -y -loglevel quiet')
+        stego_video_path = video_path.split('.')[0] + '_stego.mkv'
+
+        print("Combining new video and audio...")
+        os.system(f'"{ffmpeg_path}" -framerate {fps} -i {temp_folder}%d.png -codec copy -y temp/video-only.mkv -loglevel quiet')
+        os.system(f'"{ffmpeg_path}" -i temp/video-only.mkv -i temp/audio.mp3 -codec copy -y {stego_video_path} -loglevel quiet')
+
+        print("Deleting temp folder...")
+        if os.path.exists("./temp"):
+            try:
+                shutil.rmtree("./temp", onerror=self.remove_readonly)
+            except OSError as e:
+                print("Error: %s : %s" % ("./temp", e.strerror))
+
+        
+        print("Encoding completed!")
         return stego_video_path
+
+    def remove_readonly(self, func, path, _):
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
         
     def decode_video(self, stego_video_path, num_lsb):
-        video = cv2.VideoCapture(stego_video_path)
+        try:
+            print("Starting video decoding...")
+            n_lsb = int(num_lsb)
+            decoded_text = self.decode_lsb(stego_video_path, n_lsb)
+            return decoded_text
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
-        binary_data = ""
-        decoded_data = ""
-        while True:
-            ret, frame = video.read()
-            if not ret:
-                break
+    # Function to decode text from video using LSB
+    def decode_lsb(self, video_path, n_lsb):
+        self.frame_extract(video_path)
 
-            # For each pixel in the frame
-            for row in frame:
-                for pixel in row:
-                    # Convert RGB values to binary format
-                    r, g, b = map(lambda x: self.to_bin(x), pixel)
-                    # For each color channel
-                    for color in [r, g, b]:
-                        binary_data += color[-num_lsb:]
+        temp_folder = "./temp/"
+        # frames = sorted([f for f in os.listdir(temp_folder) if f.endswith('.png')])
+        frames = sorted([f for f in os.listdir(temp_folder) if f.endswith('.png')], key=lambda f: int(f.split('.')[0]))
+        
+        text_bits = ''
 
-            # If enough data has been collected, try to decode it
-            while len(binary_data) >= 8:
-                # Split by 8-bits
-                byte = binary_data[:8]
-                binary_data = binary_data[8:]
+        for frame_file in frames:
+            frame = cv2.imread(os.path.join(temp_folder, frame_file))
+            print("Decoding frame {}...".format(frame_file))
+            for i in range(frame.shape[0]):
+                for j in range(frame.shape[1]):
+                    for k in range(3):  # Iterate over the BGR channels
+                        bits = format(frame[i, j, k] & ((1 << n_lsb) - 1), f'0{n_lsb}b')
+                        text_bits += bits
+                        if text_bits.endswith('00000000'*8):
+                            if os.path.exists("./temp"):
+                                try:
+                                    shutil.rmtree("./temp", onerror=self.remove_readonly)
+                                except OSError as e:
+                                    print("Error: %s : %s" % ("./temp", e.strerror))
+                            decoded_text = ''.join([chr(int(text_bits[i:i+8], 2)) for i in range(0, len(text_bits) - 64, 8)])
+                            with open("decoded_text.txt", "w") as file:
+                                file.write(decoded_text)
+                            
+                            print("Decoding completed!")
+                            return "Check decoded_text.txt for the decoded text."
+                            # return ''.join([chr(int(text_bits[i:i+8], 2)) for i in range(0, len(text_bits) - 64, 8)])
 
-                # Convert from bits to characters
-                decoded_data += chr(int(byte, 2))
+        if os.path.exists("./temp"):
+            try:
+                shutil.rmtree("./temp", onerror=self.remove_readonly)
+            except OSError as e:
+                print("Error: %s : %s" % ("./temp", e.strerror))
 
-        video.release()
-        # Check for padding and return the decoded data
-        return decoded_data.rstrip('=')
+        return ''
 
 
     def encode_audio(self, cover_audio_path, payload_text, num_lsb):
@@ -350,7 +370,7 @@ class SteganographyApp:
                 self.stego_label.config(image=self.stego_image)  # Display the stego image in the label
                 messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_image_path}")  # Show a success message
             
-            elif self.cover_path.endswith('.mp4'):
+            elif self.cover_path.endswith(('.mp4', '.mkv')):
                 stego_video_path = self.encode_video(self.cover_path, payload_text, self.lsb_var.get())  # Encode the payload into the video
                 # Create a VLC instance
                 instance2 = vlc.Instance()
@@ -381,7 +401,7 @@ class SteganographyApp:
             if self.cover_path.endswith(('.bmp', '.png', '.gif', '.jpg', '.jpeg')):
                 decoded_text = self.decode_image(self.cover_path, self.lsb_var.get())  # Decode the payload from the image
                 messagebox.showinfo("Decoding", f"Decoded text: {decoded_text}")  # Show the decoded text
-            elif self.cover_path.endswith('.mp4'):
+            elif self.cover_path.endswith(('.mp4', '.mkv')):
                 decoded_text = self.decode_video(self.cover_path, self.lsb_var.get())  # Decode the payload from the image
                 messagebox.showinfo("Decoding", f"Decoded text: {decoded_text}")  # Show the decoded text
             elif self.cover_path.endswith('.wav'):

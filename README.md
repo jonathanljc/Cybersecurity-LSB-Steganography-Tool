@@ -8,6 +8,8 @@ pip install pillow
 pip install opencv-python
 # install python-vlc (for video player in gui)
 pip install python-vlc
+# install moviepy
+pip install moviepy
 # run program
 python steganography_app.py
 # Testing
