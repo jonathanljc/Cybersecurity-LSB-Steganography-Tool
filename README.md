@@ -18,3 +18,9 @@ python steganography_app.py
 3. it will produce a stego image.
 4. upload the stego image and decode it based on the LSB you set.
 5. result output would be based on the hidden text file.
+
+# INSTALLING FFMPEG (windows)
+1. https://www.wikihow.com/Install-FFmpeg-on-Windows
+
+# INSTALLING FFMPEG (mac)
+1. brew install ffmpeg

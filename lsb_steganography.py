@@ -245,15 +245,14 @@ class SteganographyApp:
             cv2.imwrite(os.path.join(temp_folder, frame_file), frame)
 
         fps = VideoFileClip(video_path).fps
-        ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg')
 
         print("Extracting audio...")
-        os.system(f'"{ffmpeg_path}" -i {video_path} -q:a 0 -map a temp/audio.mp3 -y -loglevel quiet')
+        os.system(f'ffmpeg -i {video_path} -q:a 0 -map a temp/audio.mp3 -y -loglevel quiet')
         stego_video_path = video_path.split('.')[0] + '_stego.mkv'
 
         print("Combining new video and audio...")
-        os.system(f'"{ffmpeg_path}" -framerate {fps} -i {temp_folder}%d.png -codec copy -y temp/video-only.mkv -loglevel quiet')
-        os.system(f'"{ffmpeg_path}" -i temp/video-only.mkv -i temp/audio.mp3 -codec copy -y {stego_video_path} -loglevel quiet')
+        os.system(f'ffmpeg -framerate {fps} -i {temp_folder}%d.png -codec copy -y temp/video-only.mkv -loglevel quiet')
+        os.system(f'ffmpeg -i temp/video-only.mkv -i temp/audio.mp3 -codec copy -y {stego_video_path} -loglevel quiet')
 
         print("Deleting temp folder...")
         if os.path.exists("./temp"):
