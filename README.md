@@ -10,6 +10,8 @@ pip install opencv-python
 pip install python-vlc
 # install moviepy
 pip install moviepy
+# install tkinterdnd2 (for drag and drop)
+pip install tkinterdnd2
 # run program
 python steganography_app.py
 # Testing
