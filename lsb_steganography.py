@@ -129,7 +129,7 @@ class SteganographyApp:
             elif self.cover_path.lower().endswith('.wav'):
                 messagebox.showinfo("Cover File", "Audio file selected")  # Show a message for audio files
                 # Create Play button for cover audio
-                self.play_button_cover = tk.Button(self.frame, text="Play Cover Audio", command=self.play_cover_audio)
+                self.play_button_cover = tk.Button(self.frame, text="Play Input Audio", command=self.play_cover_audio)
                 self.play_button_cover.grid(row=5, column=0)  # Adjust row and column as per your layout
 
         except UnidentifiedImageError:
