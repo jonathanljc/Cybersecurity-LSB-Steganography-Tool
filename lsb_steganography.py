@@ -9,6 +9,7 @@ import vlc
 from moviepy.editor import VideoFileClip
 import shutil
 import stat
+import pygame
 
 class SteganographyApp:
     def __init__(self, root):
@@ -17,6 +18,9 @@ class SteganographyApp:
         self.root.geometry("1200x800")
         self.root.minsize(1200, 800)
         self.root.maxsize(1200, 800)
+
+        # Initialize the mixer module
+        pygame.mixer.init()
 
         # Create a frame to hold the widgets
         self.frame = tk.Frame(root)
@@ -76,6 +80,13 @@ class SteganographyApp:
             self.cover_label.config(image="")
             self.cover_label.config(height=0, width=0)
             self.stego_label.config(height=0, width=0)
+
+            # Destroy the play buttons if they exist
+            if hasattr(self, 'play_button_cover'):
+                self.play_button_cover.destroy()
+            if hasattr(self, 'play_button_stego'):
+                self.play_button_stego.destroy()
+
             if hasattr(self, 'player'):
                 # Stop the player
                 self.player.stop()
@@ -117,6 +128,10 @@ class SteganographyApp:
 
             elif self.cover_path.lower().endswith('.wav'):
                 messagebox.showinfo("Cover File", "Audio file selected")  # Show a message for audio files
+                # Create Play button for cover audio
+                self.play_button_cover = tk.Button(self.frame, text="Play Cover Audio", command=self.play_cover_audio)
+                self.play_button_cover.grid(row=5, column=0)  # Adjust row and column as per your layout
+
         except UnidentifiedImageError:
             messagebox.showerror("Error", "Cannot identify image file. Please select a valid image file.")  # Show an error if the image can't be opened
         except Exception as e:
@@ -408,6 +423,10 @@ class SteganographyApp:
             elif self.cover_path.endswith('.wav'):
                 stego_audio_path = self.encode_audio(self.cover_path, payload_text, self.lsb_var.get())  # Encode the payload into the audio
                 messagebox.showinfo("Encoding", f"Encoding completed successfully: {stego_audio_path}")  # Show a success message
+                # Create Play button for stego audio
+                self.stego_play_path = stego_audio_path
+                self.play_button_stego = tk.Button(self.frame, text="Play Stego Audio", command=self.play_stego_audio)
+                self.play_button_stego.grid(row=5, column=1)  # Adjust row and column as per your layout
             else:
                 messagebox.showwarning("Error", "Cover file type not supported for encoding")  # Show an error message for unsupported file types
         else:
@@ -429,6 +448,14 @@ class SteganographyApp:
                 messagebox.showwarning("Error", "Cover file type not supported for decoding")  # Show an error message for unsupported file types
         else:
             messagebox.showwarning("Error", "Please select a cover file")  # Show an error message if the cover file is not selected
+
+    def play_cover_audio(self):
+        pygame.mixer.music.load(self.cover_path)
+        pygame.mixer.music.play()
+
+    def play_stego_audio(self):
+        pygame.mixer.music.load(self.stego_play_path)
+        pygame.mixer.music.play()
 
 if __name__ == "__main__":
     root = TkinterDnD.Tk()  # Create the main window

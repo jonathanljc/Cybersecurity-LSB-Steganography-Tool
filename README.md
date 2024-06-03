@@ -12,6 +12,8 @@ pip install python-vlc
 pip install moviepy
 # install tkinterdnd2 (for drag and drop)
 pip install tkinterdnd2
+# install pygame (for audio playing)
+pip install pygame
 # run program
 python steganography_app.py
 # Testing
