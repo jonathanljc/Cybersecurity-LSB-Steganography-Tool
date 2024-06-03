@@ -7,8 +7,9 @@ import os  # Import os for operating system interactions
 import cv2, numpy as np
 import vlc
 from moviepy.editor import VideoFileClip
-import shutil
-import stat
+import shutil, stat
+from pydub import AudioSegment
+import soundfile as sf
 import pygame
 
 class SteganographyApp:
@@ -205,33 +206,52 @@ class SteganographyApp:
         print("Encoding completed!")
         return stego_image_path
 
+    def to_bin(self, data):
+        """Convert a string to binary format, each character to its ASCII binary representation."""
+        if isinstance(data, str):  # Check if the input is string
+            return ''.join([bin(ord(char))[2:].zfill(8) for char in data])
+        else:
+            return bin(data)[2:].zfill(8)
+
+    def complete_decoding(self, decoded_data):
+        """Handle the completion of the decoding process."""
+        with open("decodedimage_text.txt", "w") as file:
+            file.write(decoded_data)
+        print("Decoding completed!")
+        return "Check decodedimage_text.txt for the decoded text."
+
     def decode_image(self, stego_image_path, num_lsb):
-        # read the image
+        # Read the image
         print("Reading image..")
         image = cv2.imread(stego_image_path)
         binary_data = ""
         print("Decoding image... (Please wait)")
         for row in image:
             for pixel in row:
-                # convert RGB values to binary format
+                # Convert RGB values to binary format
                 r, g, b = map(lambda x: self.to_bin(x), pixel)
-                # For each color channel
+                # Extract the least significant bits
                 for color in [r, g, b]:
                     binary_data += color[-num_lsb:]
-        # split by 8-bits
+        
+        # Split by 8-bits
         print("Splitting binary...")
         all_bytes = [binary_data[i: i + 8] for i in range(0, len(binary_data), 8)]
-        # convert from bits to characters
+        
+        # Convert from bits to characters
         print("Converting binary to characters...")
         decoded_data = ""
         for byte in all_bytes:
             decoded_data += chr(int(byte, 2))
-            if decoded_data[-5:] == "=====":
-                print("Decoding completed!")
-                return decoded_data[:-5]
-            if decoded_data[-4:] == "====":
-                print("Decoding completed!")
-                return decoded_data[:-4]
+            # Check for specific endings and complete decoding if found
+            if decoded_data.endswith("====="):
+                return self.complete_decoding(decoded_data[:-5])
+            if decoded_data.endswith("===="):
+                return self.complete_decoding(decoded_data[:-4])
+
+        # If no specific ending was found, write and return anyway
+        return self.complete_decoding(decoded_data)
+
 
     def encode_video(self, cover_video_path, payload_text, num_lsb):
         try:
@@ -354,10 +374,11 @@ class SteganographyApp:
         return ''
 
     def encode_audio(self, cover_audio_path, payload_text, num_lsb):
-        with wave.open(cover_audio_path, 'rb') as audio:
-            params = audio.getparams()  # Get audio parameters
-            frames = bytearray(list(audio.readframes(audio.getnframes())))  # Read audio frames
-
+        if cover_audio_path.endswith('.wav'):
+            with wave.open(cover_audio_path, 'rb') as audio:
+                params = audio.getparams()  # Get audio parameters
+                frames = bytearray(list(audio.readframes(audio.getnframes())))  # Read audio frames
+        
         binary_payload = ''.join(format(ord(char), '08b') for char in payload_text) + '1111111111111111'  # Convert the payload text to binary and add an end delimiter
         binary_index = 0
 
@@ -368,27 +389,37 @@ class SteganographyApp:
             else:
                 break
 
-        stego_audio_path = cover_audio_path.split('.')[0] + '_stego.wav'  # Create the path for the stego audio
-        with wave.open(stego_audio_path, 'wb') as audio:
-            audio.setparams(params)  # Set audio parameters
-            audio.writeframes(frames)  # Write the modified frames
-
+        #stego_audio_path = cover_audio_path.rsplit('.', 1)[0] + '_stego' + cover_audio_path.rsplit('.', 1)[1]  # Create the path for the stego audio
+        stego_audio_path = cover_audio_path.rsplit('.', 1)[0] + '_stego.' + cover_audio_path.rsplit('.', 1)[1]  # Create the path for the stego audio
+        if cover_audio_path.endswith('.wav'):
+            with wave.open(stego_audio_path, 'wb') as audio:
+                audio.setparams(params)  # Set audio parameters
+                audio.writeframes(frames)  # Write the modified frames to the stego audio
         return stego_audio_path
 
     def decode_audio(self, stego_audio_path, num_lsb):
         with wave.open(stego_audio_path, 'rb') as audio:
-            frames = bytearray(list(audio.readframes(audio.getnframes())))  # Read audio frames
+            frames = bytearray(list(audio.readframes(audio.getnframes())))
 
         binary_payload = ''
-
         for frame in frames:
-            binary_payload += str((frame >> (num_lsb - 1)) & 1)  # Extract the LSB
+            binary_payload += str((frame >> (num_lsb - 1)) & 1)
 
-        # Split the binary payload into bytes and convert to characters
+        # Assume the delimiter "1111111111111111" was added during encoding
+        end_delimiter = '1111111111111111'
+        if end_delimiter in binary_payload:
+            binary_payload = binary_payload[:binary_payload.index(end_delimiter)]
+
         byte_payload = [binary_payload[i:i + 8] for i in range(0, len(binary_payload), 8)]
         decoded_text = ''.join(chr(int(byte, 2)) for byte in byte_payload)
 
-        return decoded_text.split(chr(255) * 2)[0]  # Find the end delimiter and return the payload
+        with open("decodedaudio_text.txt", "w", encoding='utf-8') as file:
+            file.write(decoded_text)
+
+        print("Decoding completed!")
+        return "Check decodedaudio_text.txt for the decoded text."
+
+        #return decoded_text.split(chr(255) * 2)[0]  Find the end delimiter and return the payload
 
     def encode(self):
         # Check if both cover and payload files are selected
