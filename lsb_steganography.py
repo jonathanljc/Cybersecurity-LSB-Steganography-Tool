@@ -371,7 +371,7 @@ class SteganographyApp:
             except OSError as e:
                 print("Error: %s : %s" % ("./temp", e.strerror))
 
-        return ''
+        return 'No message in video detected'
 
     def encode_audio(self, cover_audio_path, payload_text, num_lsb):
         if cover_audio_path.endswith('.wav'):
