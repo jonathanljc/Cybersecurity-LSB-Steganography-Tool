@@ -51,14 +51,14 @@ Decode Hidden Text:
 
 ---
 
-## 🎓 Contributed By
+## 🎓 Contributors
 
-| **Name**                      | **ID**       |
-|-------------------------------|--------------|
-| Felix Chang                   | 2301105      |
-| Dawn Aw Tay Rui Qi            | 2301096      |
-| Lim Jing Chuan, Jonathan      | 2300923      |
-| Elroy Lee                     | 2300950      |
-| Ong Jia En, Darryl            | 2301402      |
-| Ong Yong Sheng                | 2301123      |
-  
+| **Name**                      | **ID**       | **Email**                          |
+|-------------------------------|--------------|------------------------------------|
+| Felix Chang                   | 2301105      | 2301105@sit.singaporetech.edu.sg   |
+| Dawn Aw Tay Rui Qi            | 2301096      | 2301096@sit.singaporetech.edu.sg   |
+| Lim Jing Chuan, Jonathan      | 2300923      | 2300923@sit.singaporetech.edu.sg   |
+| Elroy Lee                     | 2300950      | 2300950@sit.singaporetech.edu.sg   |
+| Ong Jia En, Darryl            | 2301402      | 2301402@sit.singaporetech.edu.sg   |
+| Ong Yong Sheng                | 2301123      | 2301123@sit.singaporetech.edu.sg   |
+
