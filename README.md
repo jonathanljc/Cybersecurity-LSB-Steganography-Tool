@@ -1,4 +1,8 @@
 # 🛡️ GUI-Based LSB Steganography and Steganalysis Program
+<p align="center">
+  <img src="https://github.com/jonathanljc/Cybersecurity-LSB-Steganography-Tool/blob/main/photo_6221724071079557817_y.jpg" alt="Project Image" width="500">
+</p>
+
 ## 📄 Project Overview
 
 The **GUI-based LSB Steganography and Steganalysis Program** was developed as part of **INF2005 - Cybersecurity Fundamentals ACW1**. It enables users to encode and decode text payloads into various cover objects, such as images, audio, and video files. Key features include:
