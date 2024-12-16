@@ -44,7 +44,7 @@ brew install ffmpeg
 
 ## ▶️ Running the Program
 ```bash
-python steganography_app.py
+python lsb_steganography.py
 ```
 ---
 
