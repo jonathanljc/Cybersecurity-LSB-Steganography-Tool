@@ -5,7 +5,7 @@
    ```bash
    venv\Scripts\activate
 ---
-2. **Install Required Modules** Install the following Python modules (if not already installed):
+2. **Install Required Modules** (if not already installed):
 ```bash
 pip install tkinker        # For GUI components
 pip install pillow         # For image processing
